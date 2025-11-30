@@ -188,14 +188,20 @@ Replace `MODEL_NAME` in `.env` with other spam detection models:
 spam_bot/
 ├── bot.py                          # Main bot entry point
 ├── config.py                       # Configuration loader
-├── logger.py                       # Logging setup
-├── scam_detector.py               # ML model for spam detection
-├── requirements.txt               # Python dependencies
-├── .env                           # Environment variables (create this)
-├── README.md                      # This file
+├── requirements.txt                # Python dependencies
+├── .env                            # Environment variables
+├── .env.example                    # Example env file
+├── .gitignore                      # Git ignore file
+├── LICENSE                         # License file
+├── README.md                       # Documentation
+├── utils/
+│   ├── __init__.py                # Package marker
+│   ├── logger.py                  # Logging setup
+│   ├── scam_detector.py           # ML model for spam detection
+│   └── config.py                  # (optional - if moved to utils)
 └── cogs/
-    ├── __init__.py               # Package marker
-    └── moderation.py             # Moderation commands and message monitoring
+    ├── __init__.py                # Package marker
+    └── moderation.py              # Moderation commands and message monitoring
 ```
 
 ## Testing
