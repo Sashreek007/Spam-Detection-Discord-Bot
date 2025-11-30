@@ -22,7 +22,6 @@ A powerful Discord bot that automatically detects and removes scam messages from
 - A Discord bot token
 
 ### 2. Installation
-
 **Clone or download the bot files:**
 ```bash
 cd spam_bot
