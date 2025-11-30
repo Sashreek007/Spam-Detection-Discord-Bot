@@ -30,7 +30,15 @@ class ScamDetector:
         # Run ML model
         result = self.classifier(text)[0]
         score = result['score']
-        label = result['label'].upper()
+        label = result['label']
+        
+        # Map numeric labels to text labels
+        # LABEL_0 = HAM (legitimate), LABEL_1 = SPAM (scam)
+        label_map = {
+            'LABEL_0': 'HAM',
+            'LABEL_1': 'SPAM'
+        }
+        label = label_map.get(label, label).upper()
         
         # Check for suspicious patterns
         has_suspicious = self._check_suspicious_patterns(text)
@@ -76,7 +84,13 @@ class ScamDetector:
             # ===== GIVEAWAY SCAMS =====
             r'giveaway|give.*away|claim.*prize|win.*(?:ps5|xbox|macbook|laptop)',
             r'limited.*slots?|first.*(?:people|members|users)',
-            r'free.*(?:ps5|xbox|iphone|macbook|steam)',
+            r'free.*(?:ps5|xbox|iphone|macbook|steam|air)',
+            
+            # ===== GIVEAWAY + DM PATTERN =====
+            r'@everyone.*free|free.*@everyone',
+            r'free.*(?:dm|message|dm\s+me)',
+            r'giveaway.*dm|dm.*giveaway',
+            r'(?:dm|message).*(?:interested|if|you)',
             
             # ===== PHISHING SCAMS =====
             r'verify.*account|confirm.*account|validate.*account',
@@ -108,11 +122,11 @@ class ScamDetector:
         matched_patterns = []
         for pattern in suspicious_patterns:
             if re.search(pattern, text_lower, re.IGNORECASE):
-                matched_patterns.append(pattern[:50])  # Print first 50 chars of pattern
+                matched_patterns.append(pattern[:50])
         
         if matched_patterns:
             print(f"[PATTERNS MATCHED] {len(matched_patterns)} pattern(s):")
-            for p in matched_patterns[:3]:  # Show first 3
+            for p in matched_patterns[:3]:
                 print(f"  - {p}")
         
         return len(matched_patterns) > 0
