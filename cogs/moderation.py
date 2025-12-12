@@ -2,12 +2,11 @@ import discord
 from discord.ext import commands
 from datetime import datetime
 from typing import Optional
-import sys
-from pathlib import Path
 import pytz
 
 from utils.scam_detector import ScamDetector
 from utils.logger import setup_logger
+from utils.dataset_logger import DatasetLogger
 from config import Config
 
 # Initialize logger
@@ -16,11 +15,13 @@ logger = setup_logger(__name__)
 # Set timezone to Edmonton
 LOCAL_TZ = pytz.timezone('America/Edmonton')
 
+
 class ModerationCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.scam_detector = ScamDetector()
-        self.whitelisted_roles = ['Admin', 'Moderator', 'executive', 'chat revive ping']  # Add role names to whitelist
+        self.dataset_logger = DatasetLogger()
+        self.whitelisted_roles = ['Admin', 'Moderator', 'executive', 'chat revive ping']
         
     @commands.Cog.listener()
     async def on_ready(self):
@@ -88,6 +89,10 @@ class ModerationCog(commands.Cog):
         joined_at = "Unknown"
         if isinstance(member, discord.Member) and member.joined_at:
             joined_at = member.joined_at.astimezone(LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S %Z")
+        
+        # Log to CSV dataset BEFORE deleting (in case deletion fails)
+        logger.info("[DATASET] Logging flagged message to CSV dataset")
+        self.dataset_logger.log_flagged_message(message, confidence, reason, joined_at)
         
         # Delete the message
         try:
@@ -212,8 +217,8 @@ class ModerationCog(commands.Cog):
             if member.avatar:
                 embed.set_thumbnail(url=member.avatar.url)
             
-            # Add footer indicating if DM was sent
-            embed.set_footer(text="User has been notified via DM")
+            # Add footer indicating if DM was sent and logged to CSV
+            embed.set_footer(text="User notified via DM | Logged to training dataset")
             
             # Ping moderator role
             mod_role = message.guild.get_role(Config.MODERATOR_ROLE_ID)
@@ -268,7 +273,48 @@ class ModerationCog(commands.Cog):
         embed.add_field(name="Model", value=Config.MODEL_NAME, inline=False)
         embed.add_field(name="Threshold", value=f"{Config.SCAM_THRESHOLD:.2%}", inline=True)
         
+        # Add dataset stats
+        stats = DatasetLogger.get_dataset_stats()
+        if stats['exists']:
+            embed.add_field(
+                name="Dataset Size", 
+                value=f"{stats['total_messages']} flagged messages", 
+                inline=True
+            )
+        
         await ctx.send(embed=embed)
+    
+    @commands.command(name='dataset_info')
+    @commands.has_permissions(administrator=True)
+    async def dataset_info(self, ctx: commands.Context):
+        """Show detailed information about the training dataset (Admin only)."""
+        
+        stats = DatasetLogger.get_dataset_stats()
+        
+        if not stats['exists']:
+            await ctx.send("❌ No dataset file found yet. Start flagging messages to build the dataset!")
+            return
+        
+        embed = discord.Embed(
+            title="📊 Training Dataset Information",
+            description=f"Dataset location: `{stats['file_path']}`",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(name="Total Samples", value=str(stats['total_messages']), inline=True)
+        embed.add_field(name="File Size", value=f"{stats['file_size']:,} bytes", inline=True)
+        embed.add_field(name="Format", value="CSV (UTF-8)", inline=True)
+        
+        # Show detection method breakdown
+        methods = stats.get('detection_methods', {})
+        if methods:
+            method_breakdown = "\n".join([f"• {method}: {count}" for method, count in methods.items()])
+            embed.add_field(name="Detection Methods", value=method_breakdown, inline=False)
+        
+        embed.set_footer(text="Use this dataset to fine-tune your spam detection model")
+        
+        await ctx.send(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ModerationCog(bot))
