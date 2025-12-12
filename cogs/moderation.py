@@ -100,8 +100,65 @@ class ModerationCog(commands.Cog):
             logger.error(f"Error deleting message: {e}")
             return
         
+        # Send DM notification to the user
+        await self._send_user_notification(member, guild)
+        
         # Send log to private channel
         await self._send_log(message, member, joined_at, confidence, reason, message_sent_time)
+    
+    async def _send_user_notification(self, member: discord.Member, guild: discord.Guild):
+        """Send a DM notification to the user whose message was flagged."""
+        
+        try:
+            embed = discord.Embed(
+                title="⚠️ Message Flagged",
+                description=(
+                    f"Your recent message in **{guild.name}** has been flagged by our automated "
+                    "moderation system and removed."
+                ),
+                color=discord.Color.orange()
+            )
+            
+            embed.add_field(
+                name="What does this mean?",
+                value=(
+                    "Our system detected content that may violate server rules. "
+                    "If you believe this was a mistake, please don't worry!"
+                ),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="Was this a false alarm?",
+                value=(
+                    "Please feel free to contact the server administrators or moderators. "
+                    "Your message has been logged, and if this was indeed an error, "
+                    "we can review it and restore it if needed."
+                ),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="Need help?",
+                value=(
+                    "Reach out to the server admins through the server's modmail or "
+                    "contact channels. They'll be happy to assist you!"
+                ),
+                inline=False
+            )
+            
+            embed.set_footer(text="Automated Security System")
+            
+            await member.send(embed=embed)
+            logger.info(f"Successfully sent DM notification to {member.name}")
+            
+        except discord.errors.Forbidden:
+            # User has DMs disabled or has blocked the bot
+            logger.warning(
+                f"Could not send DM to {member.name} (DMs disabled or bot blocked)"
+            )
+        except Exception as e:
+            logger.error(f"Error sending DM notification to {member.name}: {e}", exc_info=True)
     
     async def _send_log(
         self,
@@ -154,6 +211,9 @@ class ModerationCog(commands.Cog):
             # Add user avatar
             if member.avatar:
                 embed.set_thumbnail(url=member.avatar.url)
+            
+            # Add footer indicating if DM was sent
+            embed.set_footer(text="User has been notified via DM")
             
             # Ping moderator role
             mod_role = message.guild.get_role(Config.MODERATOR_ROLE_ID)
