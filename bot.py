@@ -54,7 +54,7 @@ async def load_extensions():
     logger.info("All cogs loaded successfully")
 
 async def main():
-    """Main bot entry point."""
+    """Bot entry point."""
     async with bot:
         await load_extensions()
         await bot.start(Config.DISCORD_TOKEN)
